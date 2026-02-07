@@ -5,21 +5,14 @@ MCP server that gives Claude (or any MCP client) fine-grained access to macOS Ap
 ## Requirements
 
 - macOS (uses the `sdef` command and `mdfind`)
-- Python 3.10+
-- `mcp` Python package
-
-## Install
-
-```bash
-pip install mcp
-```
+- Node.js 18+
 
 ## Setup
 
 ### Claude Code
 
 ```bash
-claude mcp add sdef-reader -- python3 /path/to/sdef_mcp.py
+claude mcp add sdef-reader -- node /path/to/sdef-mcp/server/index.js
 ```
 
 ### Claude Desktop
@@ -30,16 +23,12 @@ Add to your `claude_desktop_config.json`:
 {
   "mcpServers": {
     "sdef-reader": {
-      "command": "python3",
-      "args": ["/absolute/path/to/sdef_mcp.py"]
+      "command": "node",
+      "args": ["/absolute/path/to/sdef-mcp/server/index.js"]
     }
   }
 }
 ```
-
-### Cowork
-
-Add to your MCP settings with the same command/args pattern as Claude Desktop.
 
 ## Tools
 
