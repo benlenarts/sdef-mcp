@@ -243,7 +243,7 @@ function findAppPath(name) {
     // fall through to directory scan
   }
 
-  // Fallback: check common directories
+  // Fallback: check common directories (including subdirectories)
   for (const base of [
     "/Applications",
     "/System/Applications",
@@ -251,6 +251,19 @@ function findAppPath(name) {
   ]) {
     const candidate = join(base, `${name}.app`);
     if (existsSync(candidate)) return candidate;
+
+    // Search subdirectories (e.g. /Applications/Setapp/Bike.app)
+    if (!existsSync(base)) continue;
+    try {
+      for (const entry of readdirSync(base, { withFileTypes: true })) {
+        if (entry.isDirectory() && !entry.name.endsWith(".app")) {
+          const nested = join(base, entry.name, `${name}.app`);
+          if (existsSync(nested)) return nested;
+        }
+      }
+    } catch {
+      // ignore permission errors
+    }
   }
 
   return null;
