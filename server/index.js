@@ -270,8 +270,9 @@ function findAppPath(name) {
 }
 
 function getSdefXml(appPath) {
+  let xml;
   try {
-    return execFileSync("sdef", [appPath], {
+    xml = execFileSync("sdef", [appPath], {
       encoding: "utf8",
       timeout: 30000,
     });
@@ -281,6 +282,10 @@ function getSdefXml(appPath) {
         `The app may not be scriptable. ${err.message}`
     );
   }
+  // Strip DOCTYPE declarations — they can contain DTD parameter entities
+  // (e.g. <!ENTITY % …>) that fast-xml-parser cannot handle.
+  xml = xml.replace(/<!DOCTYPE[^>[]*(?:\[[\s\S]*?\]\s*)?>/i, "");
+  return xml;
 }
 
 // ---------------------------------------------------------------------------
