@@ -1,0 +1,10 @@
+{
+  "name": "sdef-reader",
+  "version": "1.1.0",
+  "type": "module",
+  "main": "server/index.js",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "fast-xml-parser": "^5.2.0"
+  }
+}
