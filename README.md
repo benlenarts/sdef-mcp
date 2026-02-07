@@ -17,11 +17,10 @@ claude mcp add sdef-reader -- node /path/to/sdef-mcp/server/index.js
 
 ### Claude Desktop
 
-Build and install the `.mcpb` bundle:
+Build the `.mcpb` bundle, then drag and drop it onto the Extensions section in Claude Desktop settings:
 
 ```bash
 ./build.sh
-npx @anthropic-ai/mcpb install sdef-mcp.mcpb
 ```
 
 ## Tools
