@@ -16,7 +16,7 @@
  */
 
 import { execFileSync } from "node:child_process";
-import { readdirSync, statSync, existsSync } from "node:fs";
+import { readdirSync, existsSync } from "node:fs";
 import { join, basename } from "node:path";
 import { homedir } from "node:os";
 
@@ -28,6 +28,88 @@ import {
 } from "@modelcontextprotocol/sdk/types.js";
 
 import { XMLParser } from "fast-xml-parser";
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
+
+interface DirectParam {
+  type: string;
+  description: string;
+  optional: boolean;
+}
+
+interface Param {
+  name: string;
+  code: string;
+  type: string;
+  description: string;
+  optional: boolean;
+}
+
+interface Result {
+  type: string;
+  description: string;
+}
+
+interface Command {
+  name: string;
+  code: string;
+  description: string;
+  direct_parameter: DirectParam | null;
+  parameters: Param[];
+  result: Result | null;
+}
+
+interface Property {
+  name: string;
+  code: string;
+  type: string;
+  access: string;
+  description: string;
+}
+
+interface ClassElement {
+  type: string;
+  access: string;
+}
+
+interface SDEFClass {
+  name: string;
+  code: string;
+  description: string;
+  inherits: string;
+  plural: string;
+  properties: Property[];
+  elements: ClassElement[];
+  responds_to: string[];
+  is_extension: boolean;
+}
+
+interface EnumValue {
+  name: string;
+  code: string;
+  description: string;
+}
+
+interface Enumeration {
+  name: string;
+  code: string;
+  values: EnumValue[];
+}
+
+interface Suite {
+  name: string;
+  code: string;
+  description: string;
+  commands: Command[];
+  classes: SDEFClass[];
+  enumerations: Enumeration[];
+}
+
+// Loose type for raw XML elements from fast-xml-parser
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type XmlEl = Record<string, any>;
 
 // ---------------------------------------------------------------------------
 // XML parser config
@@ -50,7 +132,7 @@ const ARRAY_TAGS = new Set([
 const xmlParser = new XMLParser({
   ignoreAttributes: false,
   attributeNamePrefix: "@_",
-  isArray: (tagName) => ARRAY_TAGS.has(tagName),
+  isArray: (tagName: string) => ARRAY_TAGS.has(tagName),
 });
 
 // ---------------------------------------------------------------------------
@@ -58,7 +140,10 @@ const xmlParser = new XMLParser({
 // ---------------------------------------------------------------------------
 
 class SDEFParser {
-  constructor(xmlString) {
+  title: string;
+  suites: Suite[];
+
+  constructor(xmlString: string) {
     const parsed = xmlParser.parse(xmlString);
     const root = parsed.dictionary;
     if (!root) {
@@ -69,17 +154,17 @@ class SDEFParser {
     this._parse(root);
   }
 
-  static _resolveType(el) {
+  private static _resolveType(el: XmlEl): string {
     if (el["@_type"]) {
-      let t = el["@_type"] || "any";
+      let t: string = el["@_type"] || "any";
       if (el["@_list"] === "yes") t = `list of ${t}`;
       return t;
     }
     const typeEls = el.type;
     if (typeEls && typeEls.length > 0) {
-      const parts = [];
+      const parts: string[] = [];
       for (const t of typeEls) {
-        let name = t["@_type"] || "any";
+        let name: string = t["@_type"] || "any";
         if (t["@_list"] === "yes") name = `list of ${name}`;
         parts.push(name);
       }
@@ -88,9 +173,9 @@ class SDEFParser {
     return "any";
   }
 
-  _parse(root) {
+  private _parse(root: XmlEl): void {
     for (const suiteEl of root.suite || []) {
-      const suite = {
+      const suite: Suite = {
         name: suiteEl["@_name"] || "",
         code: suiteEl["@_code"] || "",
         description: suiteEl["@_description"] || "",
@@ -116,8 +201,8 @@ class SDEFParser {
     }
   }
 
-  _parseCommand(el) {
-    const cmd = {
+  private _parseCommand(el: XmlEl): Command {
+    const cmd: Command = {
       name: el["@_name"] || "",
       code: el["@_code"] || "",
       description: el["@_description"] || "",
@@ -155,8 +240,8 @@ class SDEFParser {
     return cmd;
   }
 
-  _parseClass(el) {
-    const cls = {
+  private _parseClass(el: XmlEl): SDEFClass {
+    const cls: SDEFClass = {
       name: el["@_name"] || "",
       code: el["@_code"] || "",
       description: el["@_description"] || "",
@@ -186,15 +271,15 @@ class SDEFParser {
     }
 
     for (const rt of el["responds-to"] || []) {
-      const cmdName = rt["@_command"] || rt["@_name"] || "";
+      const cmdName: string = rt["@_command"] || rt["@_name"] || "";
       if (cmdName) cls.responds_to.push(cmdName);
     }
 
     return cls;
   }
 
-  _parseEnum(el) {
-    const enm = {
+  private _parseEnum(el: XmlEl): Enumeration {
+    const enm: Enumeration = {
       name: el["@_name"] || "",
       code: el["@_code"] || "",
       values: [],
@@ -214,7 +299,7 @@ class SDEFParser {
 // App discovery
 // ---------------------------------------------------------------------------
 
-function findAppPath(name) {
+function findAppPath(name: string): string | null {
   // Try mdfind first (fast, indexed)
   try {
     const result = execFileSync(
@@ -222,7 +307,7 @@ function findAppPath(name) {
       [
         `kMDItemDisplayName == '${name}' && kMDItemContentType == 'com.apple.application-bundle'`,
       ],
-      { encoding: "utf8", timeout: 10000 }
+      { encoding: "utf8", timeout: 10000 },
     );
     const paths = result
       .trim()
@@ -269,8 +354,8 @@ function findAppPath(name) {
   return null;
 }
 
-function getSdefXml(appPath) {
-  let xml;
+function getSdefXml(appPath: string): string {
+  let xml: string;
   try {
     xml = execFileSync("sdef", [appPath], {
       encoding: "utf8",
@@ -279,7 +364,7 @@ function getSdefXml(appPath) {
   } catch (err) {
     throw new Error(
       `Could not get SDEF for ${appPath}. ` +
-        `The app may not be scriptable. ${err.message}`
+        `The app may not be scriptable. ${(err as Error).message}`,
     );
   }
   // Strip DOCTYPE declarations — they can contain DTD parameter entities
@@ -292,32 +377,32 @@ function getSdefXml(appPath) {
 // Cache (in-memory, per-process)
 // ---------------------------------------------------------------------------
 
-const sdefCache = new Map();
+const sdefCache = new Map<string, SDEFParser>();
 
-function getParser(appName) {
+function getParser(appName: string): SDEFParser {
   if (!sdefCache.has(appName)) {
     const appPath = findAppPath(appName);
     if (!appPath) {
       throw new Error(
         `App '${appName}' not found. ` +
-          "Use list_scriptable_apps to see available apps."
+          "Use list_scriptable_apps to see available apps.",
       );
     }
     const xml = getSdefXml(appPath);
     sdefCache.set(appName, new SDEFParser(xml));
   }
-  return sdefCache.get(appName);
+  return sdefCache.get(appName)!;
 }
 
 // ---------------------------------------------------------------------------
 // Plist helper
 // ---------------------------------------------------------------------------
 
-function readPlist(plistPath) {
+function readPlist(plistPath: string): Record<string, unknown> {
   const json = execFileSync(
     "plutil",
     ["-convert", "json", "-o", "-", plistPath],
-    { encoding: "utf8", timeout: 5000 }
+    { encoding: "utf8", timeout: 5000 },
   );
   return JSON.parse(json);
 }
@@ -326,8 +411,8 @@ function readPlist(plistPath) {
 // App bundle finder
 // ---------------------------------------------------------------------------
 
-function findAppBundles(dir) {
-  const results = [];
+function findAppBundles(dir: string): string[] {
+  const results: string[] = [];
   if (!existsSync(dir)) return results;
 
   let entries;
@@ -341,8 +426,6 @@ function findAppBundles(dir) {
     const full = join(dir, entry.name);
     if (entry.name.endsWith(".app")) {
       results.push(full);
-      // Also recurse into .app in case there are nested .app bundles
-      // (e.g. /Applications/Utilities is a directory, not an .app)
     } else if (entry.isDirectory()) {
       results.push(...findAppBundles(full));
     }
@@ -354,8 +437,8 @@ function findAppBundles(dir) {
 // Formatters — compact, token-efficient plain text
 // ---------------------------------------------------------------------------
 
-function fmtSuitesOverview(parser) {
-  const lines = [];
+function fmtSuitesOverview(parser: SDEFParser): string {
+  const lines: string[] = [];
   for (const s of parser.suites) {
     const desc = s.description || "\u2014";
     lines.push(`\u25A0 ${s.name}`);
@@ -363,14 +446,14 @@ function fmtSuitesOverview(parser) {
     lines.push(
       `  ${s.commands.length} commands \u00B7 ` +
         `${s.classes.length} classes \u00B7 ` +
-        `${s.enumerations.length} enums`
+        `${s.enumerations.length} enums`,
     );
     lines.push("");
   }
   return lines.join("\n").trimEnd();
 }
 
-function fmtSuiteDetail(suite) {
+function fmtSuiteDetail(suite: Suite): string {
   const lines = [`${"═".repeat(3)} ${suite.name} ${"═".repeat(3)}`];
   if (suite.description) lines.push(suite.description);
   lines.push("");
@@ -392,7 +475,7 @@ function fmtSuiteDetail(suite) {
       lines.push(
         `  ${cls.name}${inh}${ext}` +
           ` (${cls.properties.length}p ${cls.elements.length}e)` +
-          desc
+          desc,
       );
     }
     lines.push("");
@@ -410,7 +493,7 @@ function fmtSuiteDetail(suite) {
   return lines.join("\n").trimEnd();
 }
 
-function fmtCommandSignature(cmd) {
+function fmtCommandSignature(cmd: Command): string {
   const parts = [cmd.name];
   if (cmd.direct_parameter) {
     const dp = cmd.direct_parameter;
@@ -428,7 +511,7 @@ function fmtCommandSignature(cmd) {
   return parts.join(" ") + desc;
 }
 
-function fmtCommandDetail(cmd, suiteName = "") {
+function fmtCommandDetail(cmd: Command, suiteName = ""): string {
   let header = `COMMAND: ${cmd.name}`;
   if (suiteName) header += `  [${suiteName}]`;
   const lines = [header];
@@ -460,7 +543,7 @@ function fmtCommandDetail(cmd, suiteName = "") {
   return lines.join("\n");
 }
 
-function fmtClassDetail(cls, suiteName = "") {
+function fmtClassDetail(cls: SDEFClass, suiteName = ""): string {
   let header = `CLASS: ${cls.name}`;
   if (suiteName) header += `  [${suiteName}]`;
   const lines = [header];
@@ -490,7 +573,7 @@ function fmtClassDetail(cls, suiteName = "") {
   return lines.join("\n");
 }
 
-function fmtEnumDetail(enm, suiteName = "") {
+function fmtEnumDetail(enm: Enumeration, suiteName = ""): string {
   let header = `ENUM: ${enm.name}`;
   if (suiteName) header += `  [${suiteName}]`;
   const lines = [header];
@@ -505,8 +588,8 @@ function fmtEnumDetail(enm, suiteName = "") {
 // Tool implementations
 // ---------------------------------------------------------------------------
 
-function listScriptableApps(searchDir = "/Applications") {
-  const scriptable = [];
+function listScriptableApps(searchDir = "/Applications"): string {
+  const scriptable: string[] = [];
   const dirsToCheck = [searchDir];
   if (searchDir === "/Applications") {
     dirsToCheck.push("/System/Applications");
@@ -535,13 +618,13 @@ function listScriptableApps(searchDir = "/Applications") {
   return "Scriptable apps:\n" + unique.map((app) => `  ${app}`).join("\n");
 }
 
-function getAppSuites(appName) {
+function getAppSuites(appName: string): string {
   const parser = getParser(appName);
   const title = `Dictionary: ${parser.title || appName}\n\n`;
   return title + fmtSuitesOverview(parser);
 }
 
-function getSuiteDetail(appName, suiteName) {
+function getSuiteDetail(appName: string, suiteName: string): string {
   const parser = getParser(appName);
   for (const suite of parser.suites) {
     if (suite.name.toLowerCase() === suiteName.toLowerCase()) {
@@ -552,9 +635,9 @@ function getSuiteDetail(appName, suiteName) {
   return `Suite '${suiteName}' not found. Available: ${available}`;
 }
 
-function getCommand(appName, commandName) {
+function getCommand(appName: string, commandName: string): string {
   const parser = getParser(appName);
-  const results = [];
+  const results: string[] = [];
   for (const suite of parser.suites) {
     for (const cmd of suite.commands) {
       if (cmd.name.toLowerCase() === commandName.toLowerCase()) {
@@ -566,15 +649,15 @@ function getCommand(appName, commandName) {
 
   const allCmds = [
     ...new Set(
-      parser.suites.flatMap((s) => s.commands.map((c) => c.name))
+      parser.suites.flatMap((s) => s.commands.map((c) => c.name)),
     ),
   ].sort();
   return `Command '${commandName}' not found.\nAvailable: ${allCmds.join(", ")}`;
 }
 
-function getClass(appName, className) {
+function getClass(appName: string, className: string): string {
   const parser = getParser(appName);
-  const results = [];
+  const results: string[] = [];
   for (const suite of parser.suites) {
     for (const cls of suite.classes) {
       if (cls.name.toLowerCase() === className.toLowerCase()) {
@@ -586,15 +669,15 @@ function getClass(appName, className) {
 
   const allClasses = [
     ...new Set(
-      parser.suites.flatMap((s) => s.classes.map((c) => c.name))
+      parser.suites.flatMap((s) => s.classes.map((c) => c.name)),
     ),
   ].sort();
   return `Class '${className}' not found.\nAvailable: ${allClasses.join(", ")}`;
 }
 
-function getEnumeration(appName, enumName) {
+function getEnumeration(appName: string, enumName: string): string {
   const parser = getParser(appName);
-  const results = [];
+  const results: string[] = [];
   for (const suite of parser.suites) {
     for (const enm of suite.enumerations) {
       if (enm.name.toLowerCase() === enumName.toLowerCase()) {
@@ -606,16 +689,16 @@ function getEnumeration(appName, enumName) {
 
   const allEnums = [
     ...new Set(
-      parser.suites.flatMap((s) => s.enumerations.map((e) => e.name))
+      parser.suites.flatMap((s) => s.enumerations.map((e) => e.name)),
     ),
   ].sort();
   return `Enum '${enumName}' not found.\nAvailable: ${allEnums.join(", ")}`;
 }
 
-function searchDictionary(appName, query) {
+function searchDictionary(appName: string, query: string): string {
   const parser = getParser(appName);
   const q = query.toLowerCase();
-  const hits = [];
+  const hits: string[] = [];
 
   for (const suite of parser.suites) {
     const sn = suite.name;
@@ -638,7 +721,7 @@ function searchDictionary(appName, query) {
         const inh = cls.inherits ? ` : ${cls.inherits}` : "";
         hits.push(
           `  CLS  [${sn}] ${cls.name}${inh}` +
-            ` (${cls.properties.length}p ${cls.elements.length}e)`
+            ` (${cls.properties.length}p ${cls.elements.length}e)`,
         );
       }
 
@@ -650,7 +733,7 @@ function searchDictionary(appName, query) {
         ) {
           const acc = prop.access !== "rw" ? ` [${prop.access}]` : "";
           hits.push(
-            `  PROP [${sn}] ${cls.name}.${prop.name}: ${prop.type}${acc}`
+            `  PROP [${sn}] ${cls.name}.${prop.name}: ${prop.type}${acc}`,
           );
         }
       }
@@ -691,7 +774,7 @@ const TOOLS = [
     description:
       "List macOS applications that have AppleScript scripting dictionaries.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         search_dir: {
           type: "string",
@@ -707,7 +790,7 @@ const TOOLS = [
     description:
       "Get a compact overview of all scripting suites in an app. Shows suite names, descriptions, and counts of commands/classes/enums. This is the recommended starting point for exploring an unfamiliar app.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         app_name: {
           type: "string",
@@ -722,7 +805,7 @@ const TOOLS = [
     description:
       "Get the full contents of a suite — commands (as signatures), classes, and enums. Use get_app_suites first to see which suites are available.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         app_name: { type: "string", description: "Application name" },
         suite_name: {
@@ -738,7 +821,7 @@ const TOOLS = [
     description:
       "Get full details for a command — parameters, types, result. If the command exists in multiple suites, all definitions are shown.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         app_name: { type: "string", description: "Application name" },
         command_name: {
@@ -755,7 +838,7 @@ const TOOLS = [
     description:
       "Get full details for a class — properties, elements, inheritance, responds-to. If the class has extensions in other suites, those are shown too.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         app_name: { type: "string", description: "Application name" },
         class_name: {
@@ -771,7 +854,7 @@ const TOOLS = [
     name: "get_enumeration",
     description: "Get all values for a specific enumeration type.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         app_name: { type: "string", description: "Application name" },
         enum_name: {
@@ -788,7 +871,7 @@ const TOOLS = [
     description:
       "Search an app's entire dictionary for commands, classes, properties, or enums matching a keyword. Searches names and descriptions. Useful when you're not sure what suite something is in.",
     inputSchema: {
-      type: "object",
+      type: "object" as const,
       properties: {
         app_name: { type: "string", description: "Application name" },
         query: {
@@ -804,7 +887,7 @@ const TOOLS = [
 
 const server = new Server(
   { name: "sdef-reader", version: "1.1.0" },
-  { capabilities: { tools: {} } }
+  { capabilities: { tools: {} } },
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -815,39 +898,51 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   const { name, arguments: args } = request.params;
 
   try {
-    let text;
+    let text: string;
     switch (name) {
       case "list_scriptable_apps":
-        text = listScriptableApps(args?.search_dir);
+        text = listScriptableApps(args?.search_dir as string | undefined);
         break;
       case "get_app_suites":
-        text = getAppSuites(args.app_name);
+        text = getAppSuites(args!.app_name as string);
         break;
       case "get_suite_detail":
-        text = getSuiteDetail(args.app_name, args.suite_name);
+        text = getSuiteDetail(
+          args!.app_name as string,
+          args!.suite_name as string,
+        );
         break;
       case "get_command":
-        text = getCommand(args.app_name, args.command_name);
+        text = getCommand(
+          args!.app_name as string,
+          args!.command_name as string,
+        );
         break;
       case "get_class":
-        text = getClass(args.app_name, args.class_name);
+        text = getClass(args!.app_name as string, args!.class_name as string);
         break;
       case "get_enumeration":
-        text = getEnumeration(args.app_name, args.enum_name);
+        text = getEnumeration(
+          args!.app_name as string,
+          args!.enum_name as string,
+        );
         break;
       case "search_dictionary":
-        text = searchDictionary(args.app_name, args.query);
+        text = searchDictionary(
+          args!.app_name as string,
+          args!.query as string,
+        );
         break;
       default:
         return {
-          content: [{ type: "text", text: `Unknown tool: ${name}` }],
+          content: [{ type: "text" as const, text: `Unknown tool: ${name}` }],
           isError: true,
         };
     }
-    return { content: [{ type: "text", text }] };
+    return { content: [{ type: "text" as const, text }] };
   } catch (err) {
     return {
-      content: [{ type: "text", text: err.message }],
+      content: [{ type: "text" as const, text: (err as Error).message }],
       isError: true,
     };
   }
