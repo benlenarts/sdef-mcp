@@ -108,8 +108,29 @@ interface Suite {
 }
 
 // Loose type for raw XML elements from fast-xml-parser
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type XmlEl = Record<string, any>;
+type XmlEl = Record<string, unknown>;
+
+/** Safely extract a string attribute from a parsed XML element. */
+function xmlStr(el: XmlEl, key: string, fallback = ""): string {
+  const v = el[key];
+  return typeof v === "string" ? v : fallback;
+}
+
+/** Check if a value is a non-array object (suitable for treating as XmlEl). */
+function isXmlEl(v: unknown): v is XmlEl {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** Safely extract an array of child elements from a parsed XML element. */
+function xmlArr(el: XmlEl, key: string): XmlEl[] {
+  const v = el[key];
+  if (!Array.isArray(v)) return [];
+  const result: XmlEl[] = [];
+  for (const item of v) {
+    if (isXmlEl(item)) result.push(item);
+  }
+  return result;
+}
 
 // ---------------------------------------------------------------------------
 // XML parser config
@@ -149,23 +170,24 @@ class SDEFParser {
     if (!root) {
       throw new Error("Malformed SDEF XML: no <dictionary> root element");
     }
-    this.title = root["@_title"] || "";
+    this.title = xmlStr(root, "@_title");
     this.suites = [];
     this._parse(root);
   }
 
   private static _resolveType(el: XmlEl): string {
-    if (el["@_type"]) {
-      let t: string = el["@_type"] || "any";
-      if (el["@_list"] === "yes") t = `list of ${t}`;
+    const attrType = xmlStr(el, "@_type");
+    if (attrType) {
+      let t = attrType;
+      if (xmlStr(el, "@_list") === "yes") t = `list of ${t}`;
       return t;
     }
-    const typeEls = el.type;
-    if (typeEls && typeEls.length > 0) {
+    const typeEls = xmlArr(el, "type");
+    if (typeEls.length > 0) {
       const parts: string[] = [];
       for (const t of typeEls) {
-        let name: string = t["@_type"] || "any";
-        if (t["@_list"] === "yes") name = `list of ${name}`;
+        let name = xmlStr(t, "@_type", "any");
+        if (xmlStr(t, "@_list") === "yes") name = `list of ${name}`;
         parts.push(name);
       }
       return parts.join(" | ");
@@ -174,27 +196,27 @@ class SDEFParser {
   }
 
   private _parse(root: XmlEl): void {
-    for (const suiteEl of root.suite || []) {
+    for (const suiteEl of xmlArr(root, "suite")) {
       const suite: Suite = {
-        name: suiteEl["@_name"] || "",
-        code: suiteEl["@_code"] || "",
-        description: suiteEl["@_description"] || "",
+        name: xmlStr(suiteEl, "@_name"),
+        code: xmlStr(suiteEl, "@_code"),
+        description: xmlStr(suiteEl, "@_description"),
         commands: [],
         classes: [],
         enumerations: [],
       };
-      for (const cmdEl of suiteEl.command || []) {
+      for (const cmdEl of xmlArr(suiteEl, "command")) {
         suite.commands.push(this._parseCommand(cmdEl));
       }
-      for (const clsEl of suiteEl.class || []) {
+      for (const clsEl of xmlArr(suiteEl, "class")) {
         suite.classes.push(this._parseClass(clsEl));
       }
-      for (const extEl of suiteEl["class-extension"] || []) {
+      for (const extEl of xmlArr(suiteEl, "class-extension")) {
         const cls = this._parseClass(extEl);
         cls.is_extension = true;
         suite.classes.push(cls);
       }
-      for (const enumEl of suiteEl.enumeration || []) {
+      for (const enumEl of xmlArr(suiteEl, "enumeration")) {
         suite.enumerations.push(this._parseEnum(enumEl));
       }
       this.suites.push(suite);
@@ -203,38 +225,38 @@ class SDEFParser {
 
   private _parseCommand(el: XmlEl): Command {
     const cmd: Command = {
-      name: el["@_name"] || "",
-      code: el["@_code"] || "",
-      description: el["@_description"] || "",
+      name: xmlStr(el, "@_name"),
+      code: xmlStr(el, "@_code"),
+      description: xmlStr(el, "@_description"),
       direct_parameter: null,
       parameters: [],
       result: null,
     };
 
     const dp = el["direct-parameter"];
-    if (dp) {
+    if (isXmlEl(dp)) {
       cmd.direct_parameter = {
         type: SDEFParser._resolveType(dp),
-        description: dp["@_description"] || "",
-        optional: dp["@_optional"] === "yes",
+        description: xmlStr(dp, "@_description"),
+        optional: xmlStr(dp, "@_optional") === "yes",
       };
     }
 
-    for (const p of el.parameter || []) {
+    for (const p of xmlArr(el, "parameter")) {
       cmd.parameters.push({
-        name: p["@_name"] || "",
-        code: p["@_code"] || "",
+        name: xmlStr(p, "@_name"),
+        code: xmlStr(p, "@_code"),
         type: SDEFParser._resolveType(p),
-        description: p["@_description"] || "",
-        optional: p["@_optional"] === "yes",
+        description: xmlStr(p, "@_description"),
+        optional: xmlStr(p, "@_optional") === "yes",
       });
     }
 
     const res = el.result;
-    if (res) {
+    if (isXmlEl(res)) {
       cmd.result = {
         type: SDEFParser._resolveType(res),
-        description: res["@_description"] || "",
+        description: xmlStr(res, "@_description"),
       };
     }
     return cmd;
@@ -242,36 +264,36 @@ class SDEFParser {
 
   private _parseClass(el: XmlEl): SDEFClass {
     const cls: SDEFClass = {
-      name: el["@_name"] || "",
-      code: el["@_code"] || "",
-      description: el["@_description"] || "",
-      inherits: el["@_inherits"] || "",
-      plural: el["@_plural"] || "",
+      name: xmlStr(el, "@_name"),
+      code: xmlStr(el, "@_code"),
+      description: xmlStr(el, "@_description"),
+      inherits: xmlStr(el, "@_inherits"),
+      plural: xmlStr(el, "@_plural"),
       properties: [],
       elements: [],
       responds_to: [],
       is_extension: false,
     };
 
-    for (const p of el.property || []) {
+    for (const p of xmlArr(el, "property")) {
       cls.properties.push({
-        name: p["@_name"] || "",
-        code: p["@_code"] || "",
+        name: xmlStr(p, "@_name"),
+        code: xmlStr(p, "@_code"),
         type: SDEFParser._resolveType(p),
-        access: p["@_access"] || "rw",
-        description: p["@_description"] || "",
+        access: xmlStr(p, "@_access", "rw"),
+        description: xmlStr(p, "@_description"),
       });
     }
 
-    for (const e of el.element || []) {
+    for (const e of xmlArr(el, "element")) {
       cls.elements.push({
         type: SDEFParser._resolveType(e),
-        access: e["@_access"] || "rw",
+        access: xmlStr(e, "@_access", "rw"),
       });
     }
 
-    for (const rt of el["responds-to"] || []) {
-      const cmdName: string = rt["@_command"] || rt["@_name"] || "";
+    for (const rt of xmlArr(el, "responds-to")) {
+      const cmdName = xmlStr(rt, "@_command") || xmlStr(rt, "@_name");
       if (cmdName) cls.responds_to.push(cmdName);
     }
 
@@ -280,19 +302,25 @@ class SDEFParser {
 
   private _parseEnum(el: XmlEl): Enumeration {
     const enm: Enumeration = {
-      name: el["@_name"] || "",
-      code: el["@_code"] || "",
+      name: xmlStr(el, "@_name"),
+      code: xmlStr(el, "@_code"),
       values: [],
     };
-    for (const v of el.enumerator || []) {
+    for (const v of xmlArr(el, "enumerator")) {
       enm.values.push({
-        name: v["@_name"] || "",
-        code: v["@_code"] || "",
-        description: v["@_description"] || "",
+        name: xmlStr(v, "@_name"),
+        code: xmlStr(v, "@_code"),
+        description: xmlStr(v, "@_description"),
       });
     }
     return enm;
   }
+}
+
+/** Extract a message string from an unknown error value. */
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
 }
 
 // ---------------------------------------------------------------------------
@@ -364,7 +392,7 @@ function getSdefXml(appPath: string): string {
   } catch (err) {
     throw new Error(
       `Could not get SDEF for ${appPath}. ` +
-        `The app may not be scriptable. ${(err as Error).message}`,
+        `The app may not be scriptable. ${errorMessage(err)}`,
     );
   }
   // Strip DOCTYPE declarations — they can contain DTD parameter entities
@@ -380,18 +408,20 @@ function getSdefXml(appPath: string): string {
 const sdefCache = new Map<string, SDEFParser>();
 
 function getParser(appName: string): SDEFParser {
-  if (!sdefCache.has(appName)) {
-    const appPath = findAppPath(appName);
-    if (!appPath) {
-      throw new Error(
-        `App '${appName}' not found. ` +
-          "Use list_scriptable_apps to see available apps.",
-      );
-    }
-    const xml = getSdefXml(appPath);
-    sdefCache.set(appName, new SDEFParser(xml));
+  const cached = sdefCache.get(appName);
+  if (cached) return cached;
+
+  const appPath = findAppPath(appName);
+  if (!appPath) {
+    throw new Error(
+      `App '${appName}' not found. ` +
+        "Use list_scriptable_apps to see available apps.",
+    );
   }
-  return sdefCache.get(appName)!;
+  const xml = getSdefXml(appPath);
+  const parser = new SDEFParser(xml);
+  sdefCache.set(appName, parser);
+  return parser;
 }
 
 // ---------------------------------------------------------------------------
@@ -885,6 +915,27 @@ const TOOLS = [
   },
 ];
 
+/** Safely extract a string argument from the MCP tool args, throwing if missing. */
+function requireArg(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): string {
+  const v = args?.[key];
+  if (typeof v !== "string" || v.length === 0) {
+    throw new Error(`Missing required argument: ${key}`);
+  }
+  return v;
+}
+
+/** Safely extract an optional string argument from the MCP tool args. */
+function optionalArg(
+  args: Record<string, unknown> | undefined,
+  key: string,
+): string | undefined {
+  const v = args?.[key];
+  return typeof v === "string" ? v : undefined;
+}
+
 const server = new Server(
   { name: "sdef-reader", version: "1.1.0" },
   { capabilities: { tools: {} } },
@@ -901,36 +952,39 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     let text: string;
     switch (name) {
       case "list_scriptable_apps":
-        text = listScriptableApps(args?.search_dir as string | undefined);
+        text = listScriptableApps(optionalArg(args, "search_dir"));
         break;
       case "get_app_suites":
-        text = getAppSuites(args!.app_name as string);
+        text = getAppSuites(requireArg(args, "app_name"));
         break;
       case "get_suite_detail":
         text = getSuiteDetail(
-          args!.app_name as string,
-          args!.suite_name as string,
+          requireArg(args, "app_name"),
+          requireArg(args, "suite_name"),
         );
         break;
       case "get_command":
         text = getCommand(
-          args!.app_name as string,
-          args!.command_name as string,
+          requireArg(args, "app_name"),
+          requireArg(args, "command_name"),
         );
         break;
       case "get_class":
-        text = getClass(args!.app_name as string, args!.class_name as string);
+        text = getClass(
+          requireArg(args, "app_name"),
+          requireArg(args, "class_name"),
+        );
         break;
       case "get_enumeration":
         text = getEnumeration(
-          args!.app_name as string,
-          args!.enum_name as string,
+          requireArg(args, "app_name"),
+          requireArg(args, "enum_name"),
         );
         break;
       case "search_dictionary":
         text = searchDictionary(
-          args!.app_name as string,
-          args!.query as string,
+          requireArg(args, "app_name"),
+          requireArg(args, "query"),
         );
         break;
       default:
@@ -942,7 +996,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     return { content: [{ type: "text" as const, text }] };
   } catch (err) {
     return {
-      content: [{ type: "text" as const, text: (err as Error).message }],
+      content: [{ type: "text" as const, text: errorMessage(err) }],
       isError: true,
     };
   }
