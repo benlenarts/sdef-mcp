@@ -1,7 +1,8 @@
+src/
+tsconfig.json
 sdef_mcp.py
 pyproject.toml
 build.sh
 *.md
 .git/
 .gitignore
-ziDELK6b
