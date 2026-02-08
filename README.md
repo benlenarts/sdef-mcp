@@ -1,6 +1,10 @@
 # sdef-mcp
 
-MCP server that gives Claude (or any MCP client) fine-grained access to macOS AppleScript dictionaries (SDEF). Instead of dumping an entire app dictionary into context, Claude can progressively drill into just the suites, commands, classes, and properties it needs.
+MCP server that gives any MCP client fine-grained access to macOS AppleScript dictionaries (SDEF). Instead of dumping an entire app dictionary into context, the client can progressively drill into just the suites, commands, classes, and properties it needs.
+
+## Why
+
+Most macOS desktop apps are scriptable via AppleScript, but LLMs don't know their APIs. This MCP lets any client efficiently discover the scripting capabilities of any app on your Mac — browsing suites, looking up commands and classes on demand — so it can write correct AppleScript without guessing.
 
 ## Requirements
 
