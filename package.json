@@ -5,7 +5,7 @@
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",
-    "pack": "tsc && npx @anthropic-ai/mcpb pack .",
+    "pack": "npm install && tsc && npx @anthropic-ai/mcpb pack .",
     "cc-install": "npm run build && claude mcp add sdef-reader -- node $(pwd)/dist/index.js",
     "cc-uninstall": "claude mcp remove sdef-reader"
   },
