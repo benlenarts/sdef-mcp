@@ -1,6 +1,7 @@
 {
-  "manifest_version": "0.2",
+  "manifest_version": "0.3",
   "name": "sdef-reader",
+  "display_name": "SDEF Reader",
   "version": "1.1.0",
   "description": "Read macOS app AppleScript scripting dictionaries (SDEF)",
   "author": {
@@ -8,10 +9,25 @@
   },
   "server": {
     "type": "node",
-    "entry_point": "dist/bundle.js",
+    "entry_point": "dist/bundle.cjs",
     "mcp_config": {
       "command": "node",
-      "args": ["${__dirname}/dist/bundle.js"]
+      "args": ["${__dirname}/dist/bundle.cjs"]
+    }
+  },
+  "tools": [
+    { "name": "list_scriptable_apps", "description": "List macOS applications that have AppleScript scripting dictionaries" },
+    { "name": "get_app_suites", "description": "Get overview of all scripting suites in an app" },
+    { "name": "get_suite_detail", "description": "Get commands, classes, and enums in a suite" },
+    { "name": "get_command", "description": "Get full command signature with parameters and types" },
+    { "name": "get_class", "description": "Get class details — properties, elements, inheritance" },
+    { "name": "get_enumeration", "description": "Get all values for an enumeration type" },
+    { "name": "search_dictionary", "description": "Search an app's dictionary by keyword" }
+  ],
+  "compatibility": {
+    "platforms": ["darwin"],
+    "runtimes": {
+      "node": ">=18.0.0"
     }
   }
 }

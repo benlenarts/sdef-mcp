@@ -2,6 +2,7 @@ node_modules/
 src/
 dist/index.js
 dist/index.js.map
+dist/bundle.js
 tsconfig.json
 esbuild.config.js
 sdef_mcp.py
@@ -10,4 +11,6 @@ build.sh
 *.md
 .git/
 .gitignore
+.mcpbignore
 package-lock.json
+*.mcpb

@@ -1005,5 +1005,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 // Entry point
 // ---------------------------------------------------------------------------
 
-const transport = new StdioServerTransport();
-await server.connect(transport);
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+}
+
+main().catch((err) => {
+  console.error("sdef-reader fatal:", err);
+  process.exit(1);
+});

@@ -5,8 +5,8 @@ await build({
   bundle: true,
   platform: "node",
   target: "node18",
-  format: "esm",
-  outfile: "dist/bundle.js",
+  format: "cjs",
+  outfile: "dist/bundle.cjs",
   banner: { js: "#!/usr/bin/env node" },
   minify: true,
 });
