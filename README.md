@@ -16,7 +16,9 @@ Most macOS desktop apps are scriptable via AppleScript, but LLMs don't know thei
 ### Claude Code
 
 ```bash
-claude mcp add sdef-reader -- node /path/to/sdef-mcp/server/index.js
+cd /path/to/sdef-mcp
+npm install && npm run build
+claude mcp add sdef-reader -- node /path/to/sdef-mcp/dist/bundle.cjs
 ```
 
 ### Claude Desktop
@@ -24,7 +26,7 @@ claude mcp add sdef-reader -- node /path/to/sdef-mcp/server/index.js
 Build the `.mcpb` bundle, then drag and drop it onto the Extensions section in Claude Desktop settings:
 
 ```bash
-./build.sh
+npm run pack
 ```
 
 ## Tools
