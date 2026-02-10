@@ -2,11 +2,11 @@
   "name": "sdef-reader",
   "version": "1.1.0",
   "type": "module",
-  "main": "dist/index.js",
+  "main": "dist/bundle.js",
   "scripts": {
-    "build": "tsc",
-    "pack": "npm install && tsc && npx @anthropic-ai/mcpb pack .",
-    "cc-install": "npm run build && claude mcp add sdef-reader -- node $(pwd)/dist/index.js",
+    "build": "tsc && node esbuild.config.js",
+    "pack": "npm install && npm run build && npx @anthropic-ai/mcpb pack .",
+    "cc-install": "npm run build && claude mcp add sdef-reader -- node $(pwd)/dist/bundle.js",
     "cc-uninstall": "claude mcp remove sdef-reader"
   },
   "dependencies": {
@@ -15,6 +15,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.27.3",
     "typescript": "^5.7.0"
   }
 }
