@@ -2,12 +2,8 @@ node_modules/
 src/
 dist/index.js
 dist/index.js.map
-dist/bundle.js
 tsconfig.json
 esbuild.config.js
-sdef_mcp.py
-pyproject.toml
-build.sh
 *.md
 .git/
 .gitignore

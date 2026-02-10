@@ -653,7 +653,39 @@ function getAppSuites(appName: string): string {
   return title + fmtSuitesOverview(parser);
 }
 
+/**
+ * Generic lookup across all suites in a parsed SDEF dictionary.
+ * Finds items by case-insensitive name match and formats them, or returns
+ * a "not found" message listing all available names.
+ */
+function findInSuites<T extends { name: string }>(
+  appName: string,
+  needle: string,
+  label: string,
+  getItems: (suite: Suite) => T[],
+  format: (item: T, suiteName: string) => string,
+): string {
+  const parser = getParser(appName);
+  const lc = needle.toLowerCase();
+  const results: string[] = [];
+
+  for (const suite of parser.suites) {
+    for (const item of getItems(suite)) {
+      if (item.name.toLowerCase() === lc) {
+        results.push(format(item, suite.name));
+      }
+    }
+  }
+  if (results.length > 0) return results.join("\n\n");
+
+  const all = [
+    ...new Set(parser.suites.flatMap((s) => getItems(s).map((i) => i.name))),
+  ].sort();
+  return `${label} '${needle}' not found.\nAvailable: ${all.join(", ")}`;
+}
+
 function getSuiteDetail(appName: string, suiteName: string): string {
+  // Suites are top-level, so use a simpler direct lookup
   const parser = getParser(appName);
   for (const suite of parser.suites) {
     if (suite.name.toLowerCase() === suiteName.toLowerCase()) {
@@ -665,63 +697,18 @@ function getSuiteDetail(appName: string, suiteName: string): string {
 }
 
 function getCommand(appName: string, commandName: string): string {
-  const parser = getParser(appName);
-  const results: string[] = [];
-  for (const suite of parser.suites) {
-    for (const cmd of suite.commands) {
-      if (cmd.name.toLowerCase() === commandName.toLowerCase()) {
-        results.push(fmtCommandDetail(cmd, suite.name));
-      }
-    }
-  }
-  if (results.length > 0) return results.join("\n\n");
-
-  const allCmds = [
-    ...new Set(
-      parser.suites.flatMap((s) => s.commands.map((c) => c.name)),
-    ),
-  ].sort();
-  return `Command '${commandName}' not found.\nAvailable: ${allCmds.join(", ")}`;
+  return findInSuites(appName, commandName, "Command",
+    (s) => s.commands, fmtCommandDetail);
 }
 
 function getClass(appName: string, className: string): string {
-  const parser = getParser(appName);
-  const results: string[] = [];
-  for (const suite of parser.suites) {
-    for (const cls of suite.classes) {
-      if (cls.name.toLowerCase() === className.toLowerCase()) {
-        results.push(fmtClassDetail(cls, suite.name));
-      }
-    }
-  }
-  if (results.length > 0) return results.join("\n\n");
-
-  const allClasses = [
-    ...new Set(
-      parser.suites.flatMap((s) => s.classes.map((c) => c.name)),
-    ),
-  ].sort();
-  return `Class '${className}' not found.\nAvailable: ${allClasses.join(", ")}`;
+  return findInSuites(appName, className, "Class",
+    (s) => s.classes, fmtClassDetail);
 }
 
 function getEnumeration(appName: string, enumName: string): string {
-  const parser = getParser(appName);
-  const results: string[] = [];
-  for (const suite of parser.suites) {
-    for (const enm of suite.enumerations) {
-      if (enm.name.toLowerCase() === enumName.toLowerCase()) {
-        results.push(fmtEnumDetail(enm, suite.name));
-      }
-    }
-  }
-  if (results.length > 0) return results.join("\n\n");
-
-  const allEnums = [
-    ...new Set(
-      parser.suites.flatMap((s) => s.enumerations.map((e) => e.name)),
-    ),
-  ].sort();
-  return `Enum '${enumName}' not found.\nAvailable: ${allEnums.join(", ")}`;
+  return findInSuites(appName, enumName, "Enum",
+    (s) => s.enumerations, fmtEnumDetail);
 }
 
 function searchDictionary(appName: string, query: string): string {
