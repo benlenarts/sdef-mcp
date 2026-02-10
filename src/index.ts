@@ -1,4 +1,3 @@
-#!/usr/bin/env node
 /**
  * sdef-mcp: MCP server for reading macOS AppleScript dictionaries (SDEF).
  *
